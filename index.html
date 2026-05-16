@@ -9,8 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="profile.jpg">
-  <link rel="icon" type="image/x-icon" href="profilr.jpg">
-  <link rel="shortcut icon" href="assets/favicon.ico">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1020">
 </head>
@@ -41,57 +39,144 @@
       Encrypt
     </button>
     <div id="encryptionTab" class="mt-6 p-4 surface-muted rounded-lg hidden slide-in">
-      <h2 class="text-xl font-semibold text-emerald-400 mb-4">Generate Secure Password</h2>
-      <p class="text-emerald-300 font-medium text-sm mb-4 p-3 surface-muted rounded-lg shadow-sm scale-in">🔑 Please provide a unique name combined with a symbol or number to create a secure password (e.g., Kolkata@2025, Indian_Army, Police@100).</p>
+      <h2 class="text-xl font-semibold text-emerald-400 mb-4">Encrypt / Decrypt Secure Text</h2>
+      <p class="text-emerald-300 font-medium text-sm mb-4 p-3 surface-muted rounded-lg shadow-sm scale-in">🔐 Enter text to encrypt or paste ciphertext to decrypt, then provide a passphrase to derive the AES-GCM key.</p>
       <div class="mb-4">
-        <div class="flex items-center gap-2">
+        <div class="mb-3">
           <input
             id="inputText"
+            type="text"
+            placeholder="Enter text to encrypt or ciphertext to decrypt"
+            maxlength="10000"
+            class="w-full p-2 border border-indigo-500/40 bg-transparent placeholder:text-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm text-slate-100 input-neon"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <input
+            id="passphraseText"
             type="password"
-            placeholder="Enter your password"
-            maxlength="20"
+            placeholder="Enter passphrase"
+            maxlength="6000"
             class="flex-1 min-w-0 p-2 border border-indigo-500/40 bg-transparent placeholder:text-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-sm text-slate-100 input-neon"
           />
-          <button id="toggleVisibility" type="button" class="px-3 py-2 text-xs rounded-lg surface-muted hover-scale shrink-0">Show</button>
+          <button id="togglePassphraseVisibility" type="button" class="px-3 py-2 text-xs rounded-lg surface-muted hover-scale shrink-0">Show</button>
         </div>
         <div class="w-full flex items-center justify-between mt-2">
           <label class="switch text-sm text-emerald-300 font-semibold">
-            <input id="urlSafeToggle" type="checkbox" aria-label="Toggle URL safe mode">
+            <input id="urlSafeToggle" type="checkbox" aria-label="Toggle URL-safe Base64 output">
             <span class="switch-track"></span>
-            <span class="ml-2">URL-safe mode</span>
+            <span class="ml-2">URL-safe output</span>
           </label>
-          <span id="lengthCounter" class="text-sm text-indigo-200 whitespace-nowrap">0/20</span>
+          <span id="lengthCounter" class="text-sm text-indigo-200 whitespace-nowrap">0/10000</span>
         </div>
       </div>
-      <button id="generateBtn" class="w-full btn-neon text-white font-semibold py-2 px-4 rounded-lg hover-scale tilt-3d interactive-radius">
-        Create
-      </button>
+      <div class="flex gap-3">
+        <button id="encryptActionBtn" class="flex-1 btn-neon text-white font-semibold py-2 px-4 rounded-lg hover-scale tilt-3d interactive-radius">Encrypt</button>
+        <button id="decryptActionBtn" class="flex-1 btn-neon text-white font-semibold py-2 px-4 rounded-lg hover-scale tilt-3d interactive-radius">Decrypt</button>
+      </div>
       <div id="outputSection" class="mt-4 p-4 surface-muted rounded-lg hidden">
-        <p class="text-indigo-300 font-medium text-sm"><strong>Encrypted Password:</strong> <span id="outputText">[Encrypted output here]</span></p>
+        <p class="text-indigo-300 font-medium text-sm"><strong>Output:</strong> <span id="outputText">[Encrypted output here]</span></p>
         <button id="copyBtn" class="mt-2 btn-neon text-white font-semibold py-1 px-3 rounded-lg hover-scale tilt-3d interactive-radius">
           Copy
         </button>
       </div>
-      <p class="text-red-400 font-medium italic text-sm mt-4 p-3 surface-muted border border-red-500/20 rounded-lg scale-in text-center">🔒 You need not remember the encrypted password; remember the original, and we will provide the encrypted format.</p>
+      <p class="text-red-400 font-medium italic text-sm mt-4 p-3 surface-muted border border-red-500/20 rounded-lg scale-in text-center">🔒 This tool uses AES-GCM encryption. Keep your passphrase safe.</p>
     </div>
   </div>
   <footer class="mt-10 text-center interactive-radius tilt-3d">
     <p class="text-sm text-indigo-300/80 mb-2">© SafePro by KilledKiller. All rights reserved.</p>
     <p class="text-red-400 font-semibold text-sm">⚠️ Your data is not stored. Privacy respected.</p>
-    <p class="text-xs text-indigo-300/70 mt-2">Note: This tool performs deterministic obfuscation, not cryptographic encryption. Do not use for storing sensitive secrets.</p>
+    <p class="text-xs text-indigo-300/70 mt-2">Note: This tool uses AES-GCM encryption. Keep your passphrase safe.</p>
   </footer>
   </div>
 
   <script>
     // (cleaned) No avatar fallbacks needed; using single path in HTML
 
-    // Deterministic hash function for consistent transformations
-    function simpleHash(str) {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = (hash * 31 + str.charCodeAt(i)) % 1000000;
+    const textEncoder = new TextEncoder();
+    const textDecoder = new TextDecoder();
+    const SALT = textEncoder.encode('zero-trace-salt-v1');
+
+    async function getCryptoKey(passphrase) {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        textEncoder.encode(passphrase),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: SALT,
+          iterations: 250000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach((b) => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+
+    function base64ToArrayBuffer(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
       }
-      return hash;
+      return bytes.buffer;
+    }
+
+    function toBase64URL(buffer) {
+      return arrayBufferToBase64(buffer)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function fromBase64URL(base64url) {
+      let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      if (pad) {
+        base64 += '='.repeat(4 - pad);
+      }
+      return base64ToArrayBuffer(base64);
+    }
+
+    async function encryptText(plaintext, passphrase, urlSafe) {
+      const key = await getCryptoKey(passphrase);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        textEncoder.encode(plaintext)
+      );
+      const payload = new Uint8Array(iv.byteLength + ciphertext.byteLength);
+      payload.set(iv, 0);
+      payload.set(new Uint8Array(ciphertext), iv.byteLength);
+      return urlSafe ? toBase64URL(payload.buffer) : arrayBufferToBase64(payload.buffer);
+    }
+
+    async function decryptText(encoded, passphrase) {
+      const ciphertext = fromBase64URL(encoded);
+      const bytes = new Uint8Array(ciphertext);
+      const iv = bytes.slice(0, 12);
+      const data = bytes.slice(12);
+      const key = await getCryptoKey(passphrase);
+      const plaintext = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        data
+      );
+      return textDecoder.decode(plaintext);
     }
 
     // Show encryption tab with animation
@@ -99,103 +184,69 @@
       const tab = document.getElementById('encryptionTab');
       tab.classList.remove('hidden');
       tab.classList.add('slide-in');
-      // Ensure the card stays centered when expanded
       const card = tab.closest('.glass-card');
       if (card) {
         card.classList.add('mx-auto');
       }
-      // update length counter and enforce max length
       const input = document.getElementById('inputText');
       const counter = document.getElementById('lengthCounter');
-      const toggle = document.getElementById('toggleVisibility');
+      const toggle = document.getElementById('togglePassphraseVisibility');
       if (input && counter) {
-        counter.textContent = `${input.value.length}/20`;
+        counter.textContent = `${input.value.length}/1000`;
         input.addEventListener('input', () => {
-          if (input.value.length > 20) input.value = input.value.slice(0, 20);
-          counter.textContent = `${input.value.length}/20`;
+          if (input.value.length > 1000) input.value = input.value.slice(0, 1000);
+          counter.textContent = `${input.value.length}/1000`;
         });
       }
-      if (toggle && input) {
+      if (toggle) {
+        const passInput = document.getElementById('passphraseText');
         toggle.onclick = () => {
-          const isPwd = input.type === 'password';
-          input.type = isPwd ? 'text' : 'password';
+          const isPwd = passInput.type === 'password';
+          passInput.type = isPwd ? 'text' : 'password';
           toggle.textContent = isPwd ? 'Hide' : 'Show';
         };
       }
     });
 
-    // Deterministic 10-layer encryption logic
-    document.getElementById('generateBtn').addEventListener('click', () => {
-      const input = document.getElementById('inputText').value;
-      if (input.length < 8 || input.length > 20) {
-        showToast('Password must be 8–20 characters.');
-        return;
-      }
-
-      // Character sets for encryption
-      const chars = {
-        engLower: 'abcdefghijklmnopqrstuvwxyz',
-        engUpper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-        codes: 'pythonjavascriptjavacsharpcppgoRustRubyPHPKotlinSwiftTypeScriptDartScalaPerlHaskellElixirClojureErlangLuaSolidityRMatlabJuliaFortranCOBOLPascalShellBatchPowerShellSQLNoSQLHTMLCSSXMLYAMLJSON',
-        words: ['alpha','beta','gamma','delta','omega','cipher','matrix','quantum','neon','hacker','crypto','root','zero','trace','vector','signal','shadow','ghost','proxy','kernel'],
-        numbers: '0123456789',
-        symbols: " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~§©®™•…–—‚„“”‘’·±÷×¶ºª°€£¥₹₩₽₺₨₿¢¤¿¡¬µ◇◆★☆✦✧✩✪✫✬✭✮✯✰✓✔✕✖✗♥♡❤❥∞≈≠≤≥√∆πµΩ←→↑↓↔↕↩↪⇧⇩◀▶▲▼◈◉◎◌○●◻◼◽◾□■△▲▽▼◁◀▷▶♠♣♦♤♧♢♪♫♭♯§✨",
-        urlSafeSymbols: "-_.~@"
-      };
-
-      let result = input;
-      const hash = simpleHash(input); // Deterministic seed based on input
-
-      // Layer 1: Caesar cipher with fixed shift
-      result = result.split('').map(c => String.fromCharCode(c.charCodeAt(0) + 3)).join('');
-
-      // Layer 2: Uppercase substitution based on hash
-      result = result.split('').map((c, i) => (hash + i) % 3 === 0 ? chars.engUpper[(c.charCodeAt(0) + hash) % chars.engUpper.length] : c).join('');
-
-      // Layer 3: Append code-themed character based on hash
-      result += chars.codes[hash % chars.codes.length];
-
-      // Layer 4: Append another code-themed character with offset
-      result += chars.codes[(hash + 7) % chars.codes.length];
-
-      // Extra: Append a random word token from list (deterministic by hash)
-      const word = chars.words[hash % chars.words.length];
-      result += '-' + word + '-';
-
-      // Layer 5: Insert number at fixed position based on hash
-      result = result.slice(0, 5) + chars.numbers[hash % chars.numbers.length] + result.slice(5);
-
-      // Layer 6: Insert symbol at fixed position based on hash (URL-safe aware)
-      const useUrlSafe = (document.getElementById('urlSafeToggle')?.checked) || false;
-      const symSet = useUrlSafe ? chars.urlSafeSymbols : chars.symbols;
-      result = result.slice(0, 8) + symSet[hash % symSet.length] + result.slice(8);
-
-      // Layer 7: Reverse string
-      result = result.split('').reverse().join('');
-
-      // Layer 8: Insert lowercase based on hash
-      result = result.split('').map((c, i) => (hash + i) % 4 === 0 ? c + chars.engLower[(hash + i) % chars.engLower.length] : c).join('');
-
-      // Layer 9: Deterministic permutation based on input length
-      const len = result.length;
-      const perm = Array.from({ length: len }, (_, i) => (hash + i) % len);
-      result = perm.map(i => result[i]).join('');
-
-      // Layer 10: Trim to 8-20 characters and add final symbol (URL-safe aware)
-      result = result.substring(0, 19) + symSet[(hash + 2) % symSet.length];
-
-      // Ensure length is within 8-20 and sanitize if URL-safe requested
-      result = result.substring(0, Math.min(result.length, 20));
-      if (useUrlSafe) {
-        result = result.replace(/[^A-Za-z0-9\-_.~@]/g, '-');
-      }
-
+    async function showCryptoResult(result) {
       const outputSection = document.getElementById('outputSection');
       document.getElementById('outputText').textContent = result;
       outputSection.classList.remove('hidden');
       outputSection.classList.add('pulse');
-      // Remove pulse animation after it completes to allow re-triggering
       setTimeout(() => outputSection.classList.remove('pulse'), 300);
+    }
+
+    document.getElementById('encryptActionBtn').addEventListener('click', async () => {
+      const input = document.getElementById('inputText').value.trim();
+      const passphrase = document.getElementById('passphraseText').value;
+      const urlSafe = document.getElementById('urlSafeToggle').checked;
+      if (!input || !passphrase) {
+        showToast('Enter text and passphrase to encrypt.');
+        return;
+      }
+      try {
+        const result = await encryptText(input, passphrase, urlSafe);
+        await showCryptoResult(result);
+      } catch (err) {
+        console.error(err);
+        showToast('Encryption failed. Check your passphrase and try again.');
+      }
+    });
+
+    document.getElementById('decryptActionBtn').addEventListener('click', async () => {
+      const input = document.getElementById('inputText').value.trim();
+      const passphrase = document.getElementById('passphraseText').value;
+      if (!input || !passphrase) {
+        showToast('Enter ciphertext and passphrase to decrypt.');
+        return;
+      }
+      try {
+        const result = await decryptText(input, passphrase);
+        await showCryptoResult(result);
+      } catch (err) {
+        console.error(err);
+        showToast('Decryption failed. Verify ciphertext and passphrase.');
+      }
     });
 
     // Utility: Toast
@@ -213,7 +264,7 @@
     document.getElementById('copyBtn').addEventListener('click', () => {
       const output = document.getElementById('outputText').textContent;
       navigator.clipboard.writeText(output).then(() => {
-        showToast('Encrypted password copied!');
+        showToast('Output copied to clipboard!');
       });
     });
 
@@ -266,7 +317,7 @@
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.floor(window.innerWidth * dpr);
         canvas.height = Math.floor(window.innerHeight * dpr);
-        ctx.scale(dpr, dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         columns = Math.floor(window.innerWidth / baseStep);
         drops = Array.from({ length: columns }, () => Math.random() * window.innerHeight);
         fontSizes = Array.from({ length: columns }, () => 12 + Math.floor(Math.random() * 9)); // 12–20px

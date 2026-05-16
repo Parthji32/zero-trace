@@ -2,7 +2,8 @@ const CACHE_NAME = 'zerotrace-v1';
 const ASSETS = [
   './index.html',
   './styles.css',
-  './assets/favicon.jpg'
+  './profile.jpg',
+  './manifest.webmanifest'
 ];
 
 self.addEventListener('install', (event) => {
