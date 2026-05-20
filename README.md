@@ -23,13 +23,6 @@ The app is built using modern web standards, including a service worker for offl
 - Web App Manifest
 - GitHub Pages deployment
 
-## Resume-ready summary
-
-- Developed `zero-trace`, an installable Progressive Web App with client-side AES-GCM encryption/decryption and offline support.
-- Implemented browser-based passphrase key derivation using PBKDF2, secure ciphertext handling, and URL-safe output encoding.
-- Designed a responsive cyberpunk UI with animated effects, user interaction states, and accessibility-friendly controls.
-- Deployed the app on GitHub Pages as a static PWA with service worker caching for improved performance and offline availability.
-
 ## Deployment
 
 The project is deployed on GitHub Pages at:
